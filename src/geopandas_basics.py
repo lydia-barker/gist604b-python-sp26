@@ -524,14 +524,148 @@ def overlay_and_visualize(
         >>> result = overlay_and_visualize(cities, save_path='cities_map.png')
         >>> plt.show()
     """
-    # TODO: Implement this function
-    # Hints:
-    # - If gdf2 provided, perform overlay with gpd.overlay()
-    # - Create visualization with gdf.plot()
-    # - Add basemap with contextily if available
-    # - For interactive map, use gdf.explore()
-    # - Calculate statistics (feature counts, total area)
-    # - Save figure if save_path provided
+    import geopandas as gpd
+import matplotlib.pyplot as plt
+from matplotlib.patches import Patch
+from typing import Dict, Any, Optional, Union
+from pathlib import Path
+
+def overlay_and_visualize(
+    gdf1: gpd.GeoDataFrame,
+    gdf2: Optional[gpd.GeoDataFrame] = None,
+    overlay_how: str = 'intersection',
+    save_path: Optional[Union[str, Path]] = None
+) -> Dict[str, Any]:
+    """
+    Perform overlay operations and create visualizations.
+    
+    Combines two spatial datasets using geometric overlay operations
+    and generates both static and interactive visualizations.
+    
+    Overlay operations:
+    - 'intersection': Areas where both datasets overlap
+    - 'union': Combined areas from both datasets
+    - 'difference': Areas in gdf1 not in gdf2
+    - 'symmetric_difference': Areas in either but not both
+    
+    Args:
+        gdf1: First GeoDataFrame
+        gdf2: Second GeoDataFrame (optional for visualization only)
+        overlay_how: Type of overlay operation
+        save_path: Optional path to save the visualization
+        
+    Returns:
+        Dictionary containing:
+        - 'overlay_result': GeoDataFrame with overlay results (if gdf2 provided)
+        - 'figure': Matplotlib figure object
+        - 'statistics': Dictionary of geometry counts and areas
+        
+    Raises:
+        ValueError: If inputs are invalid or overlay operation fails
+        
+    Example:
+        >>> # Find intersection of two polygon layers
+        >>> result = overlay_and_visualize(parks, flood_zones, 'intersection')
+        >>> overlay_gdf = result['overlay_result']
+        >>> print(f"Intersection area: {overlay_gdf.geometry.area.sum()}")
+        
+        >>> # Just visualize a single layer
+        >>> result = overlay_and_visualize(cities, save_path='cities_map.png')
+        >>> plt.show()
+    """   
+    result = {}
+    
+    # If gdf2 is provided, perform overlay operation
+    if gdf2 is not None:
+        # Validate inputs
+        if not isinstance(gdf1, gpd.GeoDataFrame) or not isinstance(gdf2, gpd.GeoDataFrame):
+            raise ValueError("Both inputs must be GeoDataFrames")
+        
+        # Check CRS compatibility
+        if gdf1.crs != gdf2.crs:
+            raise ValueError(
+                f"CRS mismatch: gdf1 has {gdf1.crs}, gdf2 has {gdf2.crs}. "
+                "Transform to same CRS before overlay."
+            )
+        
+        # Validate overlay operation
+        valid_operations = ['intersection', 'union', 'difference', 'symmetric_difference']
+        if overlay_how not in valid_operations:
+            raise ValueError(
+                f"Invalid overlay operation '{overlay_how}'. "
+                f"Must be one of: {', '.join(valid_operations)}"
+            )
+        
+        # Perform overlay
+        overlay_result = gpd.overlay(gdf1, gdf2, how=overlay_how)
+        result['overlay_result'] = overlay_result
+        
+        # Calculate statistics
+        stats = {
+            'operation': overlay_how,
+            'input1_count': len(gdf1),
+            'input2_count': len(gdf2),
+            'output_count': len(overlay_result),
+        }
+        
+        # Calculate areas if geometry is polygons and result is not empty
+        if len(overlay_result) > 0:
+            geom_type = overlay_result.geometry.geom_type.iloc[0]
+            if geom_type in ['Polygon', 'MultiPolygon']:
+                # Use projected CRS for area calculation if in geographic CRS
+                if overlay_result.crs and overlay_result.crs.is_geographic:
+                    overlay_proj = overlay_result.to_crs('EPSG:6933')  # Equal Area
+                    total_area_km2 = overlay_proj.geometry.area.sum() / 1e6
+                else:
+                    total_area_km2 = overlay_result.geometry.area.sum() / 1e6
+                stats['total_area_km2'] = float(total_area_km2)
+        
+        result['statistics'] = stats
+        
+        # Create visualization
+        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+        if len(overlay_result) > 0:
+            overlay_result.plot(ax=ax, alpha=0.7, edgecolor='black', cmap='viridis')
+        else:
+            # Plot original datasets if overlay is empty
+            gdf1.plot(ax=ax, alpha=0.5, edgecolor='red')
+            gdf2.plot(ax=ax, alpha=0.5, edgecolor='blue')
+
+            legend_elements = [
+                Patch(facecolor='none', edgecolor='red', label='GDF1'),
+                Patch(facecolor='none', edgecolor='blue', label='GDF2')
+            ]
+            ax.legend(handles=legend_elements)
+        ax.set_title(f"Overlay Result: {overlay_how.title()}", fontsize=14)
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+        plt.tight_layout()
+        
+    else:
+        # Visualization only (no overlay)
+        result['statistics'] = {
+            'feature_count': len(gdf1),
+            'geometry_types': gdf1.geometry.geom_type.unique().tolist()
+        }
+        
+        # Create visualization
+        fig, ax = plt.subplots(1, 1, figsize=(10, 10))
+        gdf1.plot(ax=ax, alpha=0.7, edgecolor='black', cmap='viridis')
+        ax.set_title("Spatial Data Visualization", fontsize=14)
+        ax.set_xlabel('Longitude')
+        ax.set_ylabel('Latitude')
+        plt.tight_layout()
+    
+    result['figure'] = fig
+    
+    # Save figure if path provided
+    if save_path:
+        save_path = Path(save_path)
+        fig.savefig(save_path, dpi=300, bbox_inches='tight')
+        result['saved_path'] = str(save_path)
+    
+    return result
+
     raise NotImplementedError("overlay_and_visualize not yet implemented")
 
 
