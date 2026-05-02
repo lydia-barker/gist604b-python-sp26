@@ -19,8 +19,8 @@ The workflow for this repository included following guided notebooks in which I 
 - Loaded raster data using a Rasterio Library, implemented functions to filter the data, and implemented functions to visualize targeted data.
 
 ## How to View / Run
+- Fork the repository and open it in a GitHub Codespace
 - Output of implemented functions can be found by reviewing each notebook
-- This repository can be forked for notebook duplication and then each function can be run again with datasets, filtering, and visualizations of interest.
 
 ## Repository Structure
 
